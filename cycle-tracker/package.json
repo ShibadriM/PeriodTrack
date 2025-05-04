@@ -52,6 +52,7 @@
   },
   "devDependencies": {
     "@types/react-router-dom": "^5.3.3",
-    "@types/styled-components": "^5.1.34"
+    "@types/styled-components": "^5.1.34",
+    "vite": "^6.3.4"
   }
 }

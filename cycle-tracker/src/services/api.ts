@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api/cycle-data';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api/cycle-data';
 
 export const cycleService = {
   async getCycleData() {
@@ -6,6 +6,7 @@ export const cycleService = {
     if (!response.ok) throw new Error('Failed to fetch cycle data');
     return response.json();
   },
+
   async updateCycleLength({ cycleLength }: { cycleLength: number }) {
     const response = await fetch(`${API_BASE_URL}/update-cycle-length`, {
       method: "POST",
@@ -37,13 +38,13 @@ export const cycleService = {
   },
 
   async getCycleAnalysis() {
-    const response = await fetch('http://localhost:5000/api/cycle-data/analysis');
+    const response = await fetch(`${API_BASE_URL}/analysis`);
     if (!response.ok) throw new Error('Failed to fetch analysis');
     return response.json();
   },
 
   async getCycleHistory() {
-    const response = await fetch('http://localhost:5000/api/cycle-data/history');
+    const response = await fetch(`${API_BASE_URL}/history`);
     if (!response.ok) throw new Error('Failed to fetch cycle history');
     return response.json();
   }
