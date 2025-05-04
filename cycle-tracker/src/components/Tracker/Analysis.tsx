@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { format, addDays } from 'date-fns';
 import { cycleService } from '../../services/api'; // Adjust path if needed
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Container = styled.div`
   padding: 24px;
@@ -88,6 +89,7 @@ const Analysis: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<CycleStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -95,6 +97,8 @@ const Analysis: React.FC = () => {
       try {
         const data = await cycleService.getCycleAnalysis();
         setStats(data);
+        const hist = await cycleService.getCycleHistory();
+        setHistory(hist);
       } catch (e) {
         setStats(null);
       } finally {
@@ -103,6 +107,24 @@ const Analysis: React.FC = () => {
     };
     fetchStats();
   }, []);
+
+  // Prepare cycle length data for the chart
+  // Sort history by startDate ascending
+  const sortedHistory = [...history].sort(
+    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  );
+
+  const cycleLengthData = [];
+  for (let i = 1; i < sortedHistory.length; i++) {
+    const prev = new Date(sortedHistory[i - 1].startDate);
+    const curr = new Date(sortedHistory[i].startDate);
+    const length = Math.ceil((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+    cycleLengthData.push({
+      cycle: i,
+      length,
+      start: sortedHistory[i].startDate
+    });
+  }
 
   if (loading) return <div>Loading...</div>;
   if (!stats) return <div>No analysis data found.</div>;
@@ -140,9 +162,15 @@ const Analysis: React.FC = () => {
 
       <Card>
         <h3>Cycle Length Trend</h3>
-        <Chart>
-          [Cycle Length Chart Placeholder]
-        </Chart>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={cycleLengthData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="cycle" label={{ value: 'Cycle', position: 'insideBottomRight', offset: 0 }} />
+            <YAxis label={{ value: 'Length (days)', angle: -90, position: 'insideLeft' }} />
+            <Tooltip />
+            <Line type="monotone" dataKey="length" stroke="#0057ff" activeDot={{ r: 8 }} />
+          </LineChart>
+        </ResponsiveContainer>
       </Card>
 
       <Card>

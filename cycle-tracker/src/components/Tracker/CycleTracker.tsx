@@ -97,9 +97,21 @@ const CycleTracker: React.FC = () => {
   useEffect(() => {
     if (!cycleData) return;
 
+    // Find the most recent period log before or on today
+    const today = new Date();
+    let lastLog = null;
+    if (cycleData.periodLogs && cycleData.periodLogs.length > 0) {
+      lastLog = cycleData.periodLogs
+        .filter(log => new Date(log.startDate) <= today)
+        .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
+    }
+
+    // Fallback to lastPeriodStart if no logs found
+    const lastPeriodStart = lastLog ? new Date(lastLog.startDate) : new Date(cycleData.lastPeriodStart);
+
     const { validation, phases } = calculateCyclePhases(
       cycleData.cycleLength,
-      new Date(cycleData.lastPeriodStart)
+      lastPeriodStart
     );
     
     // Show warning if cycle length is irregular
@@ -107,8 +119,7 @@ const CycleTracker: React.FC = () => {
       setWarning(validation.message);
     }
 
-    const today = new Date();
-    const daysSinceStart = differenceInDays(today, cycleData.lastPeriodStart);
+    const daysSinceStart = differenceInDays(today, lastPeriodStart);
     
     // Determine current phase
     if (daysSinceStart <= cycleData.periodLength) {
@@ -122,7 +133,7 @@ const CycleTracker: React.FC = () => {
     }
 
     // Calculate next period
-    const nextPeriodDate = addDays(cycleData.lastPeriodStart, cycleData.cycleLength);
+    const nextPeriodDate = addDays(lastPeriodStart, cycleData.cycleLength);
     const daysToNextPeriod = differenceInDays(nextPeriodDate, today);
     setNextPeriod(Math.max(0, daysToNextPeriod));
 

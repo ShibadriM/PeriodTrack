@@ -125,6 +125,7 @@ const AddSymptoms: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [todaysSymptoms, setTodaysSymptoms] = useState<string[]>([]);
   const [fetching, setFetching] = useState(true);
+  const [canLogToday, setCanLogToday] = useState<boolean>(false);
 
   const categories = ['Mood', 'Physical', 'Energy', 'Other'];
 
@@ -137,8 +138,15 @@ const AddSymptoms: React.FC = () => {
           (s: any) => s.date && s.date.startsWith(today)
         );
         setTodaysSymptoms(todays.map((s: any) => s.type));
+        // Check if today is within any period log
+        const isWithinPeriod = (data.periodLogs || []).some(
+          (log: any) =>
+            today >= log.startDate.slice(0, 10) && today <= log.endDate.slice(0, 10)
+        );
+        setCanLogToday(isWithinPeriod);
       } catch (e) {
         setTodaysSymptoms([]);
+        setCanLogToday(false);
       } finally {
         setFetching(false);
       }
@@ -159,6 +167,11 @@ const AddSymptoms: React.FC = () => {
     setError(null);
     try {
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      if (!canLogToday) {
+        setError("You can only log symptoms for days within a period.");
+        setLoading(false);
+        return;
+      }
       for (const symptomId of selectedSymptoms) {
         const symptom = symptoms.find(s => s.id === symptomId);
         if (symptom) {
@@ -229,7 +242,7 @@ const AddSymptoms: React.FC = () => {
         <Button 
           variant="primary" 
           onClick={handleSave}
-          disabled={loading}
+          disabled={loading || !canLogToday}
         >
           {loading ? "Saving..." : "Save"}
         </Button>

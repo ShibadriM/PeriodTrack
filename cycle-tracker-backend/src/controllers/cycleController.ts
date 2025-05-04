@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
 import CycleData from '../models/CycleData';
 
+export const clearPeriodLogs = async (req: Request, res: Response) => {
+  try {
+    await CycleData.updateOne({}, { $set: { periodLogs: [] } });
+    res.json({ message: 'Period logs cleared.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error clearing period logs' });
+  }
+};
 export const getCycleData = async (
   req: Request,
   res: Response
@@ -98,26 +106,48 @@ export const getCycleHistory = async (req: Request, res: Response) => {
 };
 export const getCycleAnalysis = async (req: Request, res: Response) => {
   try {
-    // Get the latest (or only) cycle data document
     const cycleData = await CycleData.findOne().sort({ updatedAt: -1 });
 
+    // No period logs at all
     if (!cycleData || !cycleData.periodLogs || cycleData.periodLogs.length === 0) {
       return res.json({
-        averageLength: 0,
-        lengthVariation: 0,
-        periodLength: 0,
-        periodVariation: 0,
-        ovulationDay: 0,
+        averageLength: null,
+        lengthVariation: null,
+        periodLength: null,
+        periodVariation: null,
+        ovulationDay: null,
         lutealPhase: 14,
-        symptoms: []
+        symptoms: [],
+        message: "No period data available. Please log at least two periods for full analysis."
       });
     }
 
-    // Calculate average cycle length and period length
-    const cycleLengths: number[] = [];
-    const periodLengths: number[] = [];
     const periodLogs = cycleData.periodLogs;
 
+    // Only one period log: can't calculate cycle length, but can show period length
+    if (periodLogs.length === 1) {
+      const log = periodLogs[0];
+      const periodLength = Math.ceil(
+        (new Date(log.endDate).getTime() - new Date(log.startDate).getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1;
+
+      return res.json({
+        averageLength: null,
+        lengthVariation: null,
+        periodLength,
+        periodVariation: null,
+        ovulationDay: null,
+        lutealPhase: 14,
+        symptoms: [],
+        message: "Not enough data to calculate cycle statistics. Please log at least two periods."
+      });
+    }
+    console.log('Period logs:', periodLogs.map(log => log.startDate));
+    // Sort period logs by startDate just in case
+    periodLogs.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+    // Calculate cycle lengths (difference between start dates of consecutive periods)
+    const cycleLengths: number[] = [];
     for (let i = 1; i < periodLogs.length; i++) {
       const prev = periodLogs[i - 1];
       const curr = periodLogs[i];
@@ -127,25 +157,26 @@ export const getCycleAnalysis = async (req: Request, res: Response) => {
       cycleLengths.push(cycleLength);
     }
 
-    for (const log of periodLogs) {
-      const periodLength = Math.ceil(
+    // Calculate period lengths
+    const periodLengths: number[] = periodLogs.map(log =>
+      Math.ceil(
         (new Date(log.endDate).getTime() - new Date(log.startDate).getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1;
-      periodLengths.push(periodLength);
-    }
+      ) + 1
+    );
 
-    const average = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    // Helper functions
+    const average = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
     const stddev = (arr: number[]) => {
-      if (arr.length < 2) return 0;
-      const avg = average(arr);
+      if (arr.length < 2) return null;
+      const avg = average(arr) as number;
       return Math.sqrt(arr.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / (arr.length - 1));
     };
 
-    const averageLength = Math.round(average(cycleLengths));
-    const lengthVariation = Math.round(stddev(cycleLengths));
-    const periodLength = Math.round(average(periodLengths));
-    const periodVariation = Math.round(stddev(periodLengths));
-    const ovulationDay = averageLength ? averageLength - 14 : 14;
+    const averageLength = cycleLengths.length ? Math.round(average(cycleLengths) as number) : null;
+    const lengthVariation = cycleLengths.length > 1 ? Math.round(stddev(cycleLengths) as number) : null;
+    const periodLength = periodLengths.length ? Math.round(average(periodLengths) as number) : null;
+    const periodVariation = periodLengths.length > 1 ? Math.round(stddev(periodLengths) as number) : null;
+    const ovulationDay = averageLength ? averageLength - 14 : null;
     const lutealPhase = 14;
 
     // Calculate symptom frequencies
@@ -166,7 +197,8 @@ export const getCycleAnalysis = async (req: Request, res: Response) => {
       periodVariation,
       ovulationDay,
       lutealPhase,
-      symptoms
+      symptoms,
+      message: "Analysis successful."
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching analysis' });
