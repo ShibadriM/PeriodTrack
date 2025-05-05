@@ -61,11 +61,11 @@ interface CycleData {
 const MonthView: React.FC = () => {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [hasInitialized, setHasInitialized] = useState(false);
   const [cycleData, setCycleData] = useState<CycleData | null>(null);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch from backend
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -81,7 +81,15 @@ const MonthView: React.FC = () => {
     fetchData();
   }, []);
 
-  // Calculate calendar days when cycleData changes
+  // Automatically select the last period start date as the visible calendar date
+  useEffect(() => {
+    if (cycleData?.lastPeriodStart && !hasInitialized) {
+      const startDate = new Date(cycleData.lastPeriodStart);
+      setSelectedDate(startDate);
+      setHasInitialized(true);
+    }
+  }, [cycleData, hasInitialized]);
+
   useEffect(() => {
     if (!cycleData) return;
 
@@ -96,24 +104,18 @@ const MonthView: React.FC = () => {
       });
     }
 
-    // Calculate ovulation based on cycle length (typically ~60% of cycle)
+    // Ovulation day
     const ovulationDay = Math.round(cycleData.cycleLength * 0.6);
     const ovulationDate = addDays(currentDate, ovulationDay);
-    days.push({
-      date: ovulationDate,
-      type: 'ovulation'
-    });
+    days.push({ date: ovulationDate, type: 'ovulation' });
 
-    // Fertile window: 3 days before and 2 days after ovulation, but within cycle bounds
+    // Fertile window
     const fertileWindowStart = Math.max(ovulationDay - 3, cycleData.periodLength);
     const fertileWindowEnd = Math.min(ovulationDay + 2, cycleData.cycleLength - 1);
 
     for (let i = fertileWindowStart; i <= fertileWindowEnd; i++) {
-      if (i === ovulationDay) continue; // Skip ovulation day as it's already added
-      days.push({
-        date: addDays(currentDate, i),
-        type: 'fertile'
-      });
+      if (i === ovulationDay) continue;
+      days.push({ date: addDays(currentDate, i), type: 'fertile' });
     }
 
     setCalendarDays(days);
