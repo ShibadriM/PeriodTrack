@@ -1,4 +1,4 @@
-const API_BASE_URL ="https://periodtrack-7.onrender.com";
+const API_BASE_URL ="https://periodtrack-7.onrender.com/api/cycle-data";
 
 export const cycleService = {
   async getCycleData() {
